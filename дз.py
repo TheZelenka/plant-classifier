@@ -4,24 +4,15 @@ import streamlit as st
 from PIL import Image
 from torchvision import transforms, models
 
-#НАСТРОЙКИ
-DATA_DIR = "C:\\Users\\sanya\\plant_leaf_classifier\\data"
-MODEL_PATH = "C:\\Users\\sanya\\PyCharmMiscProject\\best_model.pth"
+# НАСТРОЙКИ
+class_names = ['виноград', 'вишня', 'картофель', 'клубника', 'перец', 'персик', 'помидор', 'яблоко']
+MODEL_PATH = "best_model.pth"
 
 
-# 1. Получаем список классов без загрузки всего датасета
-@st.cache_data
-def get_class_names(data_dir):
-    train_dir = os.path.join(data_dir, 'train')
-    # PyTorch ImageFolder сортирует классы по алфавиту, сделаем так же:
-    classes = sorted([d for d in os.listdir(train_dir) if os.path.isdir(os.path.join(train_dir, d))])
-    return classes
-
-
-# 2. Загружаем модель в кэш Streamlit
+# 1. Загружаем модель в кэш Streamlit
 @st.cache_resource
 def load_model(model_path, num_classes):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu") 
     model = models.shufflenet_v2_x1_0(weights=False)
     num_ftrs = model.fc.in_features
     model.fc = torch.nn.Linear(num_ftrs, num_classes)
@@ -31,7 +22,7 @@ def load_model(model_path, num_classes):
     return model, device
 
 
-# 3. Функция предсказания (теперь принимает объект PIL Image)
+# 2. Функция предсказания
 def predict_image(img, model, class_names, device, img_size=224):
     tfm = transforms.Compose([
         transforms.Resize(int(img_size * 1.14)),
@@ -56,18 +47,16 @@ def predict_image(img, model, class_names, device, img_size=224):
     return results
 
 
-#ИНТЕРФЕЙС STREAMLIT
-
-st.title(" Определение вида растения по листу")
+# ИНТЕРФЕЙС STREAMLIT
+st.title("Определение вида растения по листу")
 st.write("Загрузите фотографию листа, и нейросеть определит его вид.")
 
-# Подготавливаем классы и модель
+# Подготавливаем модель
 try:
-    class_names = get_class_names(DATA_DIR)
     model, device = load_model(MODEL_PATH, num_classes=len(class_names))
 except Exception as e:
-    st.error(f"Ошибка при загрузке модели или данных: {e}")
-    st.stop()  # Останавливаем работу, если пути указаны неверно
+    st.error(f"Ошибка при загрузке модели: {e}")
+    st.stop()  # Останавливаем работу, если файл модели не найден
 
 # Виджет загрузки
 uploaded_file = st.file_uploader("Выберите изображение...", type=["jpg", "jpeg", "png"])
@@ -85,7 +74,7 @@ if uploaded_file is not None:
         results = predict_image(image, model, class_names, device)
         best_class, best_prob = results[0]
 
-        # Выводим красивый результат
+        # Выводим результат
         st.success(f"**Результат:** Это {best_class}")
         st.info(f"**Уверенность нейросети:** {best_prob * 100:.2f}%")
 
